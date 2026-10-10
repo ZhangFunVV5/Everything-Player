@@ -1,0 +1,20 @@
+# Dependencies
+**/node_modules/
+
+# Generated build and packaging output
+**/build/
+**/dist/
+**/target/
+
+# Runtime logs and temporary files
+**/logs/
+**/log/
+**/temp/
+**/tmp/
+**/*.log
+**/*.tmp
+**/*.temp
+**/*.pid
+
+# User and sample favorite data
+**/favo/
