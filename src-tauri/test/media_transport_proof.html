@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>P7-T1 synthetic media transport proof</title>
+    <style>
+      :root { color-scheme: dark; font: 15px/1.45 system-ui, sans-serif; }
+      body { max-width: 850px; margin: 24px auto; padding: 0 20px; background: #17191d; color: #e8eaed; }
+      h1 { font-size: 1.35rem; }
+      section { border: 1px solid #3b4048; border-radius: 8px; padding: 16px; margin: 14px 0; }
+      button, input { margin: 5px; }
+      button { padding: 7px 12px; }
+      #result, #events { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.5 ui-monospace, monospace; }
+      #seek { width: min(600px, 90%); }
+      .muted { color: #aeb5bf; }
+    </style>
+  </head>
+  <body>
+    <h1>P7-T1 native protocol proof (synthetic audio only)</h1>
+    <p class="muted">Debug build only. The virtual long track is one hour at 8 kHz mono. No CDN URL is used.</p>
+
+    <section>
+      <h2>Request matrix</h2>
+      <button id="run-matrix">Run GET / HEAD / Range matrix</button>
+      <button id="cancel-request">Abort a delayed request</button>
+      <pre id="result">Not run</pre>
+    </section>
+
+    <section>
+      <h2>WebView2 media element</h2>
+      <audio id="audio" controls preload="metadata" src="http://media-proof.localhost/long.wav"></audio>
+      <div>
+        <button id="play">Play synthetic one-hour tone</button>
+        <button id="pause">Pause</button>
+      </div>
+      <label for="seek">Seek</label>
+      <input id="seek" type="range" min="0" max="3600" value="0" step="1" />
+      <span id="time">0:00 / 60:00</span>
+      <pre id="events">Waiting for metadata</pre>
+    </section>
+
+    <section>
+      <h2>P7-T4 IPC-to-MediaSource gate</h2>
+      <p class="muted">Debug-only. Resolves a real video token, then feeds bounded media_audio_read chunks into MediaSource. Seeking aborts the current request and starts a Range request.</p>
+      <label for="bvid">BVID</label>
+      <input id="bvid" value="BV1Q541167Qg" size="16" />
+      <button id="ipc-play">Resolve and play through IPC</button>
+      <label for="ipc-seek">Seek</label>
+      <input id="ipc-seek" type="range" min="0" max="1000" value="0" step="1" style="width:min(600px, 90%)" />
+      <pre id="ipc-log">Not run</pre>
+    </section>
+
+    <script type="module">
+      const origin = "http://media-proof.localhost";
+      const result = document.querySelector("#result");
+      const events = document.querySelector("#events");
+      const audio = document.querySelector("#audio");
+      const seek = document.querySelector("#seek");
+      const time = document.querySelector("#time");
+      const stamp = () => new Date().toLocaleTimeString();
+      const log = (message) => { events.textContent += `\n${stamp()} ${message}`; };
+      const mmss = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+
+      const ipcLog = document.querySelector("#ipc-log");
+      const ipcSeek = document.querySelector("#ipc-seek");
+      let activeTransfer = null;
+      let activeSourceBuffer = null;
+      let mediaSource = null;
+      let activeObjectUrl = null;
+      let ipcRun = 0;
+      let ipcDuration = 0;
+      let ipcRepresentationBytes = 0;
+      let ipcBytesRead = 0;
+      let ipcMaximumChunk = 0;
+      let ipcBufferedMaximum = 0;
+      let ipcBufferedSpanMaximum = 0;
+      let ipcLastEtag = null;
+      let containerOffset = 0;
+      let nextBoxOffset = 0;
+      let boxHeader = new Uint8Array(16);
+      let boxHeaderLength = 0;
+      let boxHeaderTarget = 8;
+      let seenContainerBoxes = 0;
+      let initCapture = new Uint8Array(64 * 1024);
+      let initCaptureLength = 0;
+      let initSegment = null;
+      let seekSegments = null;
+
+      function readBoxType(bytes, offset) {
+        return String.fromCharCode(...bytes.subarray(offset + 4, offset + 8));
+      }
+
+      function parseSeekIndex() {
+        const bytes = initCapture.subarray(0, initCaptureLength);
+        const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        let offset = 0;
+        let sidxOffset = -1;
+        let sidxSize = 0;
+        let moofOffset = -1;
+        while (offset + 8 <= bytes.length) {
+          const size = view.getUint32(offset);
+          if (size < 8 || offset + size > bytes.length) break;
+          const type = readBoxType(bytes, offset);
+          if (type === "sidx") { sidxOffset = offset; sidxSize = size; }
+          if (type === "moof") { moofOffset = offset; break; }
+          offset += size;
+        }
+        if (sidxOffset < 0 || moofOffset < 0) return;
+        const version = view.getUint8(sidxOffset + 8);
+        const timescale = view.getUint32(sidxOffset + 16);
+        if (!timescale || (version !== 0 && version !== 1)) return;
+        let cursor = sidxOffset + 20;
+        const earliest = version === 0 ? view.getUint32(cursor) : Number(view.getBigUint64(cursor));
+        cursor += version === 0 ? 4 : 8;
+        const firstOffset = version === 0 ? view.getUint32(cursor) : Number(view.getBigUint64(cursor));
+        cursor += version === 0 ? 4 : 8;
+        cursor += 2;
+        const count = view.getUint16(cursor);
+        cursor += 2;
+        if (cursor + count * 12 > sidxOffset + sidxSize || count === 0) return;
+        let byteOffset = sidxOffset + sidxSize + firstOffset;
+        let time = earliest / timescale;
+        const segments = [];
+        for (let index = 0; index < count; index += 1) {
+          const reference = view.getUint32(cursor);
+          const duration = view.getUint32(cursor + 4) / timescale;
+          if (reference >>> 31 || !duration) return;
+          const size = reference & 0x7fffffff;
+          segments.push({ byteOffset, start: time, end: time + duration, size });
+          byteOffset += size;
+          time += duration;
+          cursor += 12;
+        }
+        if (segments[0].byteOffset !== moofOffset) return;
+        initSegment = bytes.slice(0, moofOffset);
+        seekSegments = segments;
+        ipcWrite(`sidx references=${count} timescale=${timescale} initBytes=${initSegment.length} firstMoof=${moofOffset} indexedUntil=${time.toFixed(1)}s`);
+      }
+
+      // Inspect top-level ISO BMFF boxes without retaining media bytes.
+      function inspectContainerBoxes(bytes) {
+        let index = 0;
+        while (index < bytes.length) {
+          if (containerOffset < nextBoxOffset) {
+            const skip = Math.min(bytes.length - index, nextBoxOffset - containerOffset);
+            index += skip;
+            containerOffset += skip;
+            continue;
+          }
+          while (index < bytes.length && boxHeaderLength < boxHeaderTarget) {
+            boxHeader[boxHeaderLength++] = bytes[index++];
+            containerOffset += 1;
+          }
+          if (boxHeaderLength < boxHeaderTarget) return;
+          const view = new DataView(boxHeader.buffer);
+          let size = view.getUint32(0);
+          if (size === 1 && boxHeaderTarget === 8) { boxHeaderTarget = 16; continue; }
+          if (size === 1) size = Number(view.getBigUint64(8));
+          const type = String.fromCharCode(...boxHeader.subarray(4, 8));
+          const start = containerOffset - boxHeaderTarget;
+          if (!Number.isSafeInteger(size) || size < boxHeaderTarget) {
+            ipcWrite(`invalid MP4 box header at offset=${start} type=${type} size=${size}`);
+            return;
+          }
+          if (seenContainerBoxes++ < 16) ipcWrite(`MP4 box ${type} offset=${start} size=${size}`);
+          nextBoxOffset = start + size;
+          boxHeaderLength = 0;
+          boxHeaderTarget = 8;
+        }
+      }
+
+      function ipcWrite(message) {
+        const line = `${stamp()} ${message}`;
+        const lines = ipcLog.textContent === "Not run" ? [] : ipcLog.textContent.split("\n");
+        lines.push(line);
+        ipcLog.textContent = lines.slice(-160).join("\n");
+      }
+
+      function tauriInvoke(command, args) {
+        const invoke = window.__TAURI_INTERNALS__?.invoke;
+        if (typeof invoke !== "function") throw new Error("Tauri IPC bridge is unavailable in this proof window");
+        return invoke(command, args);
+      }
+
+      function bytesFromIpc(value) {
+        if (value instanceof Uint8Array) return value;
+        if (value instanceof ArrayBuffer) return new Uint8Array(value);
+        if (ArrayBuffer.isView(value)) return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        throw new Error(`Unexpected media_audio_read payload: ${Object.prototype.toString.call(value)}`);
+      }
+
+      function requestUuid() {
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
+          const random = Math.floor(Math.random() * 16);
+          return (character === "x" ? random : (random & 0x3) | 0x8).toString(16);
+        });
+      }
+
+      function currentBufferedAhead() {
+        for (let index = 0; index < audio.buffered.length; index += 1) {
+          if (audio.currentTime >= audio.buffered.start(index) && audio.currentTime <= audio.buffered.end(index)) {
+            return Math.max(0, audio.buffered.end(index) - audio.currentTime);
+          }
+        }
+        return 0;
+      }
+
+      function currentBufferedSpan() {
+        if (!audio.buffered.length) return 0;
+        return audio.buffered.end(audio.buffered.length - 1) - audio.buffered.start(0);
+      }
+
+      function waitForSourceBuffer() {
+        if (!activeSourceBuffer?.updating) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+          const cleanup = () => {
+            activeSourceBuffer.removeEventListener("updateend", onEnd);
+            activeSourceBuffer.removeEventListener("error", onError);
+          };
+          const onEnd = () => { cleanup(); resolve(); };
+          const onError = () => { cleanup(); reject(new Error("SourceBuffer update failed")); };
+          activeSourceBuffer.addEventListener("updateend", onEnd, { once: true });
+          activeSourceBuffer.addEventListener("error", onError, { once: true });
+        });
+      }
+
+      async function appendIpcBytes(bytes, run) {
+        if (!bytes.byteLength) return;
+        await waitForSourceBuffer();
+        if (run !== ipcRun || !activeSourceBuffer) return;
+        activeSourceBuffer.appendBuffer(bytes);
+        await waitForSourceBuffer();
+        const firstBuffered = activeSourceBuffer.buffered.length ? activeSourceBuffer.buffered.start(0) : 0;
+        const trimBefore = Math.max(0, audio.currentTime - 30);
+        if (trimBefore > firstBuffered + 1) {
+          activeSourceBuffer.remove(firstBuffered, trimBefore);
+          await waitForSourceBuffer();
+        }
+      }
+
+      async function cancelActiveTransfer(reason) {
+        const previous = activeTransfer;
+        activeTransfer = null;
+        if (!previous) return;
+        try {
+          const cancelled = await tauriInvoke("media_audio_cancel", { requestId: previous.requestId });
+          ipcWrite(`media_audio_cancel result=${cancelled} (${reason}); request=${previous.requestId}`);
+        } catch (error) {
+          ipcWrite(`media_audio_cancel failed (${reason}): ${String(error)}`);
+        }
+      }
+
+      async function openIpcTransfer(run, range = null) {
+        const resolved = window.__p7Resolved;
+        if (!resolved) throw new Error("Resolve a media token first");
+        const requestId = requestUuid();
+        const head = await tauriInvoke("media_audio_open", {
+          requestId,
+          token: resolved.audioUrl.replace(/^media-token:\/\//, ""),
+          method: "GET",
+          range,
+          ifRange: range && ipcLastEtag ? ipcLastEtag : null,
+        });
+        if (run !== ipcRun) {
+          await tauriInvoke("media_audio_cancel", { requestId });
+          return null;
+        }
+        activeTransfer = { requestId, range };
+        ipcLastEtag = head.headers.etag ?? ipcLastEtag;
+        const contentRange = head.headers["content-range"];
+        const totalFromRange = contentRange?.match(/\/(\d+)$/)?.[1];
+        const contentLength = Number(head.headers["content-length"]);
+        const representationBytes = Number(totalFromRange ?? contentLength);
+        if (Number.isFinite(representationBytes) && representationBytes > 0) {
+          ipcRepresentationBytes = representationBytes;
+        }
+        ipcWrite(`open status=${head.status} range=${range ?? "<none>"} content-length=${head.headers["content-length"] ?? "-"} content-range=${head.headers["content-range"] ?? "-"} type=${head.headers["content-type"] ?? "-"}`);
+        return head;
+      }
+
+      async function pumpIpc(run) {
+        while (run === ipcRun && activeTransfer) {
+          if (currentBufferedAhead() >= 20) {
+            await new Promise((resolve) => setTimeout(resolve, 250));
+            continue;
+          }
+          const transfer = activeTransfer;
+          const payload = bytesFromIpc(await tauriInvoke("media_audio_read", { requestId: transfer.requestId }));
+          if (run !== ipcRun || activeTransfer !== transfer) return;
+          ipcMaximumChunk = Math.max(ipcMaximumChunk, payload.byteLength);
+          if (payload.byteLength === 0) {
+            activeTransfer = null;
+            ipcWrite(`EOF; bytesRead=${ipcBytesRead}; representation=${ipcRepresentationBytes}; maxChunk=${ipcMaximumChunk}; maxBufferedAhead=${ipcBufferedMaximum.toFixed(1)}s`);
+            if (mediaSource?.readyState === "open" && !activeSourceBuffer?.updating) mediaSource.endOfStream();
+            return;
+          }
+          ipcBytesRead += payload.byteLength;
+          if (!transfer.range) {
+            if (!seekSegments && initCaptureLength < initCapture.length) {
+              const count = Math.min(payload.length, initCapture.length - initCaptureLength);
+              initCapture.set(payload.subarray(0, count), initCaptureLength);
+              initCaptureLength += count;
+              parseSeekIndex();
+            }
+            inspectContainerBoxes(payload);
+          }
+          await appendIpcBytes(payload, run);
+          const ahead = currentBufferedAhead();
+          ipcBufferedMaximum = Math.max(ipcBufferedMaximum, ahead);
+          const span = currentBufferedSpan();
+          ipcBufferedSpanMaximum = Math.max(ipcBufferedSpanMaximum, span);
+          ipcWrite(`read ${payload.byteLength} bytes; total=${ipcBytesRead}; bufferedAhead=${ahead.toFixed(1)}s; bufferSpan=${span.toFixed(1)}s; maxChunk=${ipcMaximumChunk}`);
+        }
+      }
+
+      async function seekIpcAudio(seconds) {
+        if (!window.__p7Resolved || !seekSegments || !initSegment) {
+          ipcWrite("seek blocked: no complete MP4 sidx/init segment available");
+          return;
+        }
+        const run = ++ipcRun;
+        await cancelActiveTransfer("browser seeking");
+        await waitForSourceBuffer();
+        const end = activeSourceBuffer?.buffered.length ? activeSourceBuffer.buffered.end(activeSourceBuffer.buffered.length - 1) : 0;
+        if (activeSourceBuffer && end > 0) {
+          activeSourceBuffer.remove(0, end);
+          await waitForSourceBuffer();
+        }
+        try {
+          activeSourceBuffer?.abort();
+        } catch (error) {
+          ipcWrite(`SourceBuffer.abort failed while resetting seek parser: ${String(error)}`);
+        }
+        const segment = seekSegments.find((entry) => seconds >= entry.start && seconds < entry.end);
+        if (!segment) throw new Error(`No indexed MP4 segment covers ${seconds.toFixed(1)}s`);
+        ipcWrite(`seek target=${seconds.toFixed(1)}s indexed segment=${segment.start.toFixed(1)}-${segment.end.toFixed(1)}s byte=${segment.byteOffset} size=${segment.size}`);
+        activeSourceBuffer.timestampOffset = 0;
+        await appendIpcBytes(initSegment, run);
+        const head = await openIpcTransfer(run, `bytes=${segment.byteOffset}-`);
+        if (head?.status !== 206) throw new Error(`Segment Range returned status ${head?.status}`);
+        void pumpIpc(run).catch((error) => ipcWrite(`Range read failed: ${String(error)}`));
+      }
+
+      document.querySelector("#ipc-play").addEventListener("click", async () => {
+        try {
+          ipcLog.textContent = "Resolving…";
+          const bvid = document.querySelector("#bvid").value.trim();
+          const resolved = await tauriInvoke("media_resolve", { input: bvid });
+          window.__p7Resolved = resolved;
+          ipcDuration = Number(resolved.duration) || 0;
+          ipcRepresentationBytes = 0;
+          ipcBytesRead = 0;
+          ipcMaximumChunk = 0;
+          ipcBufferedMaximum = 0;
+          ipcBufferedSpanMaximum = 0;
+          ipcLastEtag = null;
+          containerOffset = 0;
+          nextBoxOffset = 0;
+          boxHeaderLength = 0;
+          boxHeaderTarget = 8;
+          seenContainerBoxes = 0;
+          initCapture = new Uint8Array(64 * 1024);
+          initCaptureLength = 0;
+          initSegment = null;
+          seekSegments = null;
+          ipcRun += 1;
+          await cancelActiveTransfer("new media selection");
+          audio.removeAttribute("src");
+          audio.load();
+          if (activeObjectUrl) URL.revokeObjectURL(activeObjectUrl);
+          mediaSource = new MediaSource();
+          activeObjectUrl = URL.createObjectURL(mediaSource);
+          audio.src = activeObjectUrl;
+          await new Promise((resolve, reject) => {
+            mediaSource.addEventListener("sourceopen", resolve, { once: true });
+            mediaSource.addEventListener("error", () => reject(new Error("MediaSource failed")), { once: true });
+          });
+          const candidates = ["audio/mp4; codecs=\"mp4a.40.2\"", "audio/mpeg", "audio/mp4"];
+          const mime = candidates.find((candidate) => MediaSource.isTypeSupported(candidate));
+          if (!mime) throw new Error(`No supported MediaSource audio codec: ${candidates.join(", ")}`);
+          activeSourceBuffer = mediaSource.addSourceBuffer(mime);
+          ipcSeek.max = String(Math.max(1, ipcDuration));
+          ipcSeek.value = "0";
+          ipcWrite(`resolved duration=${ipcDuration}s; MIME=${mime}; token URL remains ${resolved.audioUrl.slice(0, 14)}…`);
+          const run = ipcRun;
+          const head = await openIpcTransfer(run);
+          if (head) {
+            const pump = pumpIpc(run);
+            audio.play().then(() => ipcWrite("audio.play() resolved"), (error) => ipcWrite(`audio.play() rejected: ${error.name}`));
+            void pump.catch((error) => ipcWrite(`stream failed: ${String(error)}`));
+          }
+        } catch (error) {
+          ipcWrite(`gate failed: ${String(error)}`);
+        }
+      });
+
+      ipcSeek.addEventListener("change", () => {
+        const seconds = Number(ipcSeek.value);
+        audio.currentTime = seconds;
+        void seekIpcAudio(seconds).catch((error) => ipcWrite(`seek failed: ${String(error)}`));
+      });
+
+      audio.addEventListener("pause", () => {
+        if (activeTransfer) void cancelActiveTransfer("browser audio stopped");
+      });
+
+      window.addEventListener("pagehide", () => {
+        ipcRun += 1;
+        void cancelActiveTransfer("pagehide");
+        if (activeObjectUrl) URL.revokeObjectURL(activeObjectUrl);
+      });
+
+      for (const name of ["loadedmetadata", "canplay", "playing", "waiting", "seeking", "seeked", "error"]) {
+        audio.addEventListener(name, () => ipcWrite(`audio ${name}; current=${audio.currentTime.toFixed(1)}s; duration=${Number.isFinite(audio.duration) ? audio.duration.toFixed(1) : "unknown"}; buffered=${audio.buffered.length}`));
+      }
+
+      async function probe(label, path, options = {}) {
+        const response = await fetch(`${origin}${path}`, options);
+        const body = options.method === "HEAD" ? new Uint8Array() : new Uint8Array(await response.arrayBuffer());
+        return `${label}: ${response.status}; bytes=${body.byteLength}; content-length=${response.headers.get("content-length")}; content-range=${response.headers.get("content-range") ?? "-"}; accept-ranges=${response.headers.get("accept-ranges")}`;
+      }
+
+      document.querySelector("#run-matrix").addEventListener("click", async () => {
+        result.textContent = "Running synthetic request matrix…";
+        const rows = [];
+        try {
+          rows.push(await probe("GET full short file", "/short.wav"));
+          rows.push(await probe("HEAD long file", "/long.wav", { method: "HEAD" }));
+          rows.push(await probe("GET closed range", "/long.wav", { headers: { Range: "bytes=100-199" } }));
+          rows.push(await probe("GET open-ended range", "/long.wav", { headers: { Range: "bytes=100-" } }));
+          rows.push(await probe("GET suffix range", "/long.wav", { headers: { Range: "bytes=-200" } }));
+          rows.push(await probe("GET invalid range", "/long.wav", { headers: { Range: "bytes=999999999-" } }));
+          result.textContent = rows.join("\n");
+        } catch (error) {
+          result.textContent = `${rows.join("\n")}\nMatrix stopped: ${error}`;
+        }
+      });
+
+      document.querySelector("#cancel-request").addEventListener("click", async () => {
+        const controller = new AbortController();
+        const request = fetch(`${origin}/slow.wav`, { signal: controller.signal })
+          .then((response) => `Unexpected response ${response.status}`)
+          .catch((error) => `WebView fetch result: ${error.name}`);
+        setTimeout(() => controller.abort(), 100);
+        result.textContent = await request;
+      });
+
+      document.querySelector("#play").addEventListener("click", () => {
+        audio.play().catch((error) => log(`play failed: ${error.name}`));
+      });
+      document.querySelector("#pause").addEventListener("click", () => audio.pause());
+      seek.addEventListener("input", () => {
+        if (Number.isFinite(audio.duration)) audio.currentTime = Number(seek.value);
+      });
+      for (const name of ["loadstart", "loadedmetadata", "canplay", "playing", "waiting", "seeking", "seeked", "pause", "ended", "error"]) {
+        audio.addEventListener(name, () => {
+          if (Number.isFinite(audio.duration)) {
+            seek.max = String(audio.duration);
+            seek.value = String(audio.currentTime);
+            time.textContent = `${mmss(audio.currentTime)} / ${mmss(audio.duration)}`;
+          }
+          log(`${name}; current=${audio.currentTime.toFixed(1)}s; readyState=${audio.readyState}; networkState=${audio.networkState}`);
+        });
+      }
+      audio.addEventListener("timeupdate", () => {
+        if (Number.isFinite(audio.duration)) {
+          seek.value = String(audio.currentTime);
+          time.textContent = `${mmss(audio.currentTime)} / ${mmss(audio.duration)}`;
+        }
+      });
+      log("page ready");
+    </script>
+  </body>
+</html>

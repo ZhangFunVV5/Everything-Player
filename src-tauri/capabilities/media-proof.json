@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "media-proof",
+  "description": "Debug proof window only: resolve opaque media tokens and exercise bounded media IPC.",
+  "windows": ["media-transport-proof"],
+  "permissions": [
+    "allow-media-resolve",
+    "allow-media-audio-open",
+    "allow-media-audio-read",
+    "allow-media-audio-cancel"
+  ]
+}

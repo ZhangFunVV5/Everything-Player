@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "./src",
+    "outDir": "./build/player-state-test",
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "src/player-state.ts",
+    "src/platform/mp4-segment-index.ts",
+    "src/services/versioned-resolve.ts",
+    "src/types/errors.ts",
+    "src/types/media.ts",
+    "src/types/player.ts",
+    "src/types/favorites.ts"
+  ]
+}

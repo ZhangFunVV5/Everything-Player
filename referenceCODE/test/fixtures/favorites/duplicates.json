@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "22222222-2222-4222-8222-222222222222",
+  "name": "Synthetic Duplicate Folder",
+  "description": "Exact duplicate and case-sensitive comparison fixture",
+  "createdAt": "2026-02-03T04:05:06.000Z",
+  "updatedAt": "2026-02-03T04:06:07.000Z",
+  "items": [
+    {
+      "bvid": "BV1D2U3P4L5M",
+      "title": "Synthetic First Occurrence",
+      "owner": "Synthetic UP Duplicate",
+      "duration": 60,
+      "coverUrl": "https://example.com/duplicate-first.jpg",
+      "addedAt": "2026-02-03T04:05:16.000Z"
+    },
+    {
+      "bvid": "BV1D2U3P4L5M",
+      "title": "Synthetic Exact Duplicate",
+      "owner": "Synthetic UP Duplicate",
+      "duration": 61,
+      "coverUrl": "https://example.com/duplicate-second.jpg",
+      "addedAt": "2026-02-03T04:05:26.000Z"
+    },
+    {
+      "bvid": "BV1d2U3P4L5M",
+      "title": "Synthetic Case Variant",
+      "owner": "Synthetic UP Duplicate",
+      "duration": 62,
+      "coverUrl": "https://example.com/duplicate-case.jpg",
+      "addedAt": "2026-02-03T04:05:36.000Z"
+    }
+  ]
+}

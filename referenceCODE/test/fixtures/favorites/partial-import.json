@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "type": "bili-sound-favorites",
+  "folders": [
+    {
+      "schemaVersion": 1,
+      "id": "55555555-5555-4555-8555-555555555555",
+      "name": "Synthetic Partial One",
+      "description": "Valid folder saved before injected failure",
+      "createdAt": "2026-04-06T07:08:09.000Z",
+      "updatedAt": "2026-04-06T07:09:10.000Z",
+      "items": [
+        {
+          "bvid": "BV1C2D3E4F5G",
+          "title": "Synthetic Partial Item One",
+          "owner": "Synthetic UP Partial One",
+          "duration": 210,
+          "coverUrl": "https://example.com/partial-one.jpg",
+          "addedAt": "2026-04-06T07:08:19.000Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "66666666-6666-4666-8666-666666666666",
+      "name": "Synthetic Partial Two",
+      "description": "Valid folder whose later write may fail",
+      "createdAt": "2026-04-07T08:09:10.000Z",
+      "updatedAt": "2026-04-07T08:10:11.000Z",
+      "items": [
+        {
+          "bvid": "BV1H2J3K4L5N",
+          "title": "Synthetic Partial Item Two",
+          "owner": "Synthetic UP Partial Two",
+          "duration": 211,
+          "coverUrl": "https://example.com/partial-two.jpg",
+          "addedAt": "2026-04-07T08:09:20.000Z"
+        }
+      ]
+    }
+  ]
+}

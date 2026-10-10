@@ -1,0 +1,159 @@
+{
+  "input": "https://www.bilibili.com/video/BV1A2B3C4D5E?p=2",
+  "view": {
+    "code": 0,
+    "data": {
+      "bvid": "BV1A2B3C4D5E",
+      "title": "Frozen Fixture Video",
+      "owner": { "name": "Frozen Fixture UP" },
+      "pic": "http://images.example/video.jpg",
+      "duration": 999,
+      "cid": 9000,
+      "pages": [
+        { "cid": 9101, "part": "Frozen First Page", "duration": 111 },
+        { "cid": 9102, "part": "Frozen Second Page", "duration": 222 }
+      ],
+      "ugc_season": {
+        "season_id": "season-fixture",
+        "title": "Frozen Collection",
+        "sections": [
+          {
+            "section_id": "section-a",
+            "title": "Section A",
+            "episodes": [
+              {
+                "bvid": "BV1F2G3H4J5K",
+                "title": "Episode A1",
+                "page": { "duration": 31 },
+                "arc": { "pic": "//images.example/a1.jpg" }
+              },
+              {
+                "arc": {
+                  "bvid": "BV1L2M3N4P5Q",
+                  "title": "Episode A2",
+                  "duration": 32,
+                  "pic": "http://images.example/a2.jpg"
+                }
+              }
+            ]
+          },
+          {
+            "title": "Filtered Empty Section",
+            "episodes": [{ "title": "Missing BVID" }]
+          },
+          {
+            "title": "Section B",
+            "episodes": [
+              {
+                "bvid": "BV1R2S3T4U5V",
+                "cover": "https://images.example/b1.jpg"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "playurl": {
+    "code": 0,
+    "data": {
+      "dash": {
+        "audio": [
+          {
+            "baseUrl": "https://cdn.example/ordinary-low",
+            "backupUrl": ["https://backup.example/ordinary-low"],
+            "bandwidth": 64000,
+            "codecs": "mp4a.40.2",
+            "mimeType": "audio/mp4"
+          },
+          {
+            "base_url": "https://cdn.example/ordinary-high",
+            "backup_url": ["https://backup.example/ordinary-high"],
+            "bandwidth": "192000",
+            "codecs": "mp4a.40.2",
+            "mime_type": "audio/mp4"
+          }
+        ],
+        "dolby": {
+          "audio": [
+            {
+              "baseUrl": "https://cdn.example/dolby",
+              "backupUrl": ["https://backup.example/dolby"],
+              "bandwidth": 256000,
+              "codecs": "ec-3",
+              "mimeType": "audio/mp4"
+            }
+          ]
+        },
+        "flac": {
+          "audio": {
+            "base_url": "https://cdn.example/flac-selected",
+            "backup_url": [
+              "https://backup.example/flac-1",
+              "https://backup.example/flac-2"
+            ],
+            "bandwidth": 320000,
+            "codecs": "fLaC",
+            "mime_type": "audio/mp4"
+          }
+        }
+      }
+    }
+  },
+  "expectedResponse": {
+    "bvid": "BV1A2B3C4D5E",
+    "cid": 9101,
+    "title": "Frozen Fixture Video",
+    "owner": "Frozen Fixture UP",
+    "pageTitle": "Frozen First Page",
+    "duration": 111,
+    "coverUrl": "https://images.example/video.jpg",
+    "collection": {
+      "id": "season-fixture",
+      "title": "Frozen Collection",
+      "sections": [
+        {
+          "id": "section-a",
+          "title": "Section A",
+          "episodes": [
+            {
+              "bvid": "BV1F2G3H4J5K",
+              "title": "Episode A1",
+              "duration": 31,
+              "coverUrl": "https://images.example/a1.jpg"
+            },
+            {
+              "bvid": "BV1L2M3N4P5Q",
+              "title": "Episode A2",
+              "duration": 32,
+              "coverUrl": "https://images.example/a2.jpg"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Section B",
+          "episodes": [
+            {
+              "bvid": "BV1R2S3T4U5V",
+              "title": "BV1R2S3T4U5V",
+              "duration": null,
+              "coverUrl": "https://images.example/b1.jpg"
+            }
+          ]
+        }
+      ]
+    },
+    "audioUrl": "<opaque-media-token>"
+  },
+  "expectedNativeSource": {
+    "primaryUrl": "https://cdn.example/flac-selected",
+    "backupUrls": [
+      "https://backup.example/flac-1",
+      "https://backup.example/flac-2"
+    ],
+    "bandwidth": 320000,
+    "codec": "fLaC",
+    "mimeType": "audio/mp4"
+  }
+}

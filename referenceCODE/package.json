@@ -1,0 +1,19 @@
+{
+  "name": "bili-player-gui-demo",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "start:no-open": "node server.mjs --no-open",
+    "test": "node --test",
+    "build:exe": "node build-exe.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10",
+    "postject": "^1.0.0-alpha.6"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

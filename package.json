@@ -1,0 +1,29 @@
+{
+  "name": "everything-player",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:tauri": "vite build --mode tauri",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "tauri": "tauri",
+    "test": "npm run test:player-state && npm run test:adapter-contract && npm run test:cross-adapter",
+    "test:player-state": "tsc -p tsconfig.player-state-test.json && node --test test/player-state.test.mjs",
+    "test:adapter-contract": "tsc -p tsconfig.adapter-contract-test.json && node --test test/adapter-contract.test.mjs",
+    "test:cross-adapter": "tsc -p tsconfig.adapter-contract-test.json && node --test test/cross-adapter-contract.test.mjs"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1"
+  }
+}

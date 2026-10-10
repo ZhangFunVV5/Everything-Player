@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "11111111-1111-4111-8111-111111111111",
+  "name": "Synthetic Folder Alpha",
+  "description": "Deterministic schema-v1 fixture",
+  "createdAt": "2026-01-02T03:04:05.000Z",
+  "updatedAt": "2026-01-02T03:05:06.000Z",
+  "items": [
+    {
+      "bvid": "BV1A2B3C4D5E",
+      "title": "Synthetic Video Alpha",
+      "owner": "Synthetic UP Alpha",
+      "duration": 123,
+      "coverUrl": "https://example.com/fixture-alpha.jpg",
+      "addedAt": "2026-01-02T03:04:15.000Z"
+    },
+    {
+      "bvid": "BV1F2G3H4J5K",
+      "title": "Synthetic Video Beta",
+      "owner": "Synthetic UP Beta",
+      "duration": 456,
+      "coverUrl": "https://example.com/fixture-beta.jpg",
+      "addedAt": "2026-01-02T03:04:25.000Z"
+    }
+  ]
+}

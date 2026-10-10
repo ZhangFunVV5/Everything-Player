@@ -1,0 +1,26 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-window",
+  "description": "Least-privilege capability boundary for the bundled main window; schema-v1 favorites commands and the narrow media resolve command are granted.",
+  "windows": ["main"],
+  "permissions": [
+    "allow-favorites-list",
+    "allow-favorites-get",
+    "allow-favorites-create",
+    "allow-favorites-add-resolved-item",
+    "allow-favorites-add-item",
+    "allow-favorites-import-preview",
+    "allow-favorites-import-commit",
+    "allow-favorites-export-folder-data",
+    "allow-favorites-export-all-data",
+    "allow-favorites-select-json-file",
+    "allow-favorites-save-json-file",
+    "allow-favorites-migration-select-legacy-directory",
+    "allow-favorites-migration-cancel",
+    "allow-favorites-migration-commit",
+    "allow-media-resolve",
+    "allow-media-audio-open",
+    "allow-media-audio-read",
+    "allow-media-audio-cancel"
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "type": "bili-sound-favorites",
+  "folders": [
+    {
+      "schemaVersion": 1,
+      "id": "33333333-3333-4333-8333-333333333333",
+      "name": "Synthetic Collection One",
+      "description": "First deterministic import folder",
+      "createdAt": "2026-03-04T05:06:07.000Z",
+      "updatedAt": "2026-03-04T05:07:08.000Z",
+      "items": [
+        {
+          "bvid": "BV1N2O3P4Q5R",
+          "title": "Synthetic Collection One Item",
+          "owner": "Synthetic UP Collection One",
+          "duration": 90,
+          "coverUrl": "https://example.com/collection-one.jpg",
+          "addedAt": "2026-03-04T05:06:17.000Z"
+        },
+        {
+          "bvid": "BV1S2T3U4V5W",
+          "title": "Synthetic Collection One Item Two",
+          "owner": "Synthetic UP Collection One",
+          "duration": 91,
+          "coverUrl": "https://example.com/collection-one-two.jpg",
+          "addedAt": "2026-03-04T05:06:27.000Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "44444444-4444-4444-8444-444444444444",
+      "name": "Synthetic Collection Two",
+      "description": "Second deterministic import folder",
+      "createdAt": "2026-03-05T06:07:08.000Z",
+      "updatedAt": "2026-03-05T06:08:09.000Z",
+      "items": [
+        {
+          "bvid": "BV1X2Y3Z4A5B",
+          "title": "Synthetic Collection Two Item",
+          "owner": "Synthetic UP Collection Two",
+          "duration": 180,
+          "coverUrl": "https://example.com/collection-two.jpg",
+          "addedAt": "2026-03-05T06:07:18.000Z"
+        }
+      ]
+    }
+  ]
+}

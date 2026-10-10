@@ -1,0 +1,30 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "./src",
+    "outDir": "./build/adapter-contract-test",
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "src/vite-env.d.ts",
+    "src/composition-root.ts",
+    "src/platform/legacy-http-media-service.ts",
+    "src/platform/browser-file-transfer-service.ts",
+    "src/platform/tauri-media-service.ts",
+    "src/platform/tauri-file-transfer-service.ts",
+    "src/platform/tauri-legacy-migration-service.ts",
+    "src/favorites.ts",
+    "src/repositories/legacy-http-favorites-repository.ts",
+    "src/repositories/tauri-favorites-repository.ts",
+    "src/services/player-application-service.ts",
+    "src/services/versioned-resolve.ts",
+    "src/services/favorites-application-service.ts",
+    "src/services/legacy-migration-application-service.ts",
+    "src/platform/media-service.ts",
+    "src/platform/file-transfer-service.ts",
+    "src/repositories/favorites-repository.ts",
+    "src/types/*.ts"
+  ]
+}
